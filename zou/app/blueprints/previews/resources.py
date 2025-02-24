@@ -1,4 +1,5 @@
 import os
+import subprocess
 import orjson as json
 
 from flask import abort, request, current_app
@@ -192,6 +193,8 @@ def send_storage_file(
 
     if as_attachment:
         download_name = names_service.get_preview_file_name(preview_file_id)
+    if os.path.isfile(f"{file_path}.{extension}"):
+        file_path = f"{file_path}.{extension}"
 
     try:
         return flask_send_file(
@@ -265,6 +268,18 @@ class BaseNewPreviewFilePicture:
         file_name = f"{instance_id}.{extension}"
         file_path = os.path.join(tmp_folder, file_name)
         uploaded_file.save(file_path)
+        if extension == 'blend':
+            gltf_file_name = f"{instance_id}.glb"
+            gltf_file_path = os.path.join(tmp_folder, gltf_file_name)
+            subprocess.call(["/opt/blender/blender",
+                             "--background",
+                             "--python",
+                             "/opt/blender/export_gltf.py",
+                             "--",
+                             file_path,
+                             gltf_file_path])
+            file_store.add_file("previews", gltf_file_name, gltf_file_path)
+            os.remove(gltf_file_path)
         file_store.add_file("previews", instance_id, file_path)
         file_size = fs.get_file_size(file_path)
         preview_files_service.update_preview_file(
